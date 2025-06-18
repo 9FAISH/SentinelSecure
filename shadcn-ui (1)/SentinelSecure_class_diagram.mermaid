@@ -1,0 +1,310 @@
+classDiagram
+    %% Core System Components
+    class SentinelCore {
+        <<Main System>>
+        +initialize()
+        +shutdown()
+        +getStatus() SystemStatus
+        +registerAgent(agent: Agent) bool
+    }
+
+    %% User & Authentication
+    class User {
+        -userId: string
+        -username: string
+        -passwordHash: string
+        -email: string
+        -roleId: string
+        -twoFactorEnabled: boolean
+        -lastLogin: datetime
+        +authenticate(password: string) AuthToken
+        +enableTwoFactor() bool
+        +disableTwoFactor() bool
+        +updateProfile(profile: UserProfile) bool
+    }
+
+    class Role {
+        -roleId: string
+        -name: string
+        -permissions: Permission[]
+        +hasPermission(permissionName: string) bool
+        +addPermission(permission: Permission) bool
+        +removePermission(permission: Permission) bool
+    }
+
+    class Permission {
+        -permissionId: string
+        -name: string
+        -description: string
+        -resource: string
+        -action: string
+    }
+
+    class AuthService {
+        +login(username: string, password: string) AuthToken
+        +logout(token: string) bool
+        +validateToken(token: string) bool
+        +generateTwoFactorCode(userId: string) string
+        +verifyTwoFactorCode(userId: string, code: string) bool
+        +refreshToken(token: string) AuthToken
+    }
+
+    %% Scanning Components
+    class ScannerService {
+        +scheduleScan(target: ScanTarget, scanType: ScanType) ScanJob
+        +runScan(scanJobId: string) ScanResult
+        +cancelScan(scanJobId: string) bool
+        +getScanStatus(scanJobId: string) ScanStatus
+        +getScanResult(scanJobId: string) ScanResult
+    }
+
+    class ScanJob {
+        -scanJobId: string
+        -target: ScanTarget
+        -scanType: ScanType
+        -scheduledTime: datetime
+        -startTime: datetime
+        -endTime: datetime
+        -status: ScanStatus
+        -progress: number
+        -createdBy: string
+    }
+
+    class ScanType {
+        <<enumeration>>
+        VULNERABILITY
+        NETWORK
+        ACTIVE_DIRECTORY
+        SMB
+        COMPREHENSIVE
+    }
+
+    class ScanResult {
+        -scanResultId: string
+        -scanJobId: string
+        -findings: Finding[]
+        -summary: ScanSummary
+        -timestamp: datetime
+        +export(format: string) File
+    }
+
+    class Finding {
+        -findingId: string
+        -scanResultId: string
+        -severity: Severity
+        -title: string
+        -description: string
+        -affectedSystem: string
+        -remediation: string
+        -cveIds: string[]
+        -timestamp: datetime
+    }
+
+    class Severity {
+        <<enumeration>>
+        CRITICAL
+        HIGH
+        MEDIUM
+        LOW
+        INFO
+    }
+
+    %% Firewall Components
+    class FirewallService {
+        +getRules() FirewallRule[]
+        +addRule(rule: FirewallRule) bool
+        +updateRule(ruleId: string, rule: FirewallRule) bool
+        +deleteRule(ruleId: string) bool
+        +enableRule(ruleId: string) bool
+        +disableRule(ruleId: string) bool
+        +getFirewallStatus() FirewallStatus
+        +optimizeRules() OptimizationResult
+    }
+
+    class FirewallRule {
+        -ruleId: string
+        -name: string
+        -description: string
+        -sourceIP: string
+        -destinationIP: string
+        -protocol: string
+        -port: string
+        -action: string
+        -priority: number
+        -enabled: boolean
+        -createdAt: datetime
+        -updatedAt: datetime
+    }
+
+    %% Threat Detection
+    class ThreatDetectionService {
+        +analyzeTraffic(trafficData: TrafficData) ThreatAnalysis
+        +getDetectionRules() DetectionRule[]
+        +addDetectionRule(rule: DetectionRule) bool
+        +updateDetectionRule(ruleId: string, rule: DetectionRule) bool
+        +deleteDetectionRule(ruleId: string) bool
+        +getThreatIntelligence() ThreatIntelligenceData
+        +updateThreatIntelligence() bool
+    }
+
+    class DetectionRule {
+        -ruleId: string
+        -name: string
+        -description: string
+        -pattern: string
+        -severity: Severity
+        -enabled: boolean
+        -createdAt: datetime
+        -updatedAt: datetime
+    }
+
+    class Alert {
+        -alertId: string
+        -title: string
+        -description: string
+        -severity: Severity
+        -sourceIp: string
+        -destinationIp: string
+        -timestamp: datetime
+        -status: AlertStatus
+        -relatedRule: string
+        +acknowledge() bool
+        +resolve() bool
+        +escalate() bool
+    }
+
+    class AlertStatus {
+        <<enumeration>>
+        NEW
+        ACKNOWLEDGED
+        RESOLVED
+        FALSE_POSITIVE
+    }
+
+    %% Agent Components
+    class Agent {
+        -agentId: string
+        -hostname: string
+        -ipAddress: string
+        -operatingSystem: string
+        -version: string
+        -status: AgentStatus
+        -lastCheckin: datetime
+        +runScan(scanType: ScanType) ScanResult
+        +updateConfiguration(config: AgentConfig) bool
+        +getStatus() AgentStatus
+        +updateAgent() bool
+    }
+
+    class AgentStatus {
+        <<enumeration>>
+        ONLINE
+        OFFLINE
+        UPDATING
+        ERROR
+    }
+
+    %% Update Service
+    class UpdateService {
+        +checkForUpdates() UpdateInfo
+        +downloadUpdate(updateId: string) bool
+        +installUpdate(updateId: string) bool
+        +rollbackUpdate(updateId: string) bool
+        +getUpdateHistory() Update[]
+    }
+
+    class Update {
+        -updateId: string
+        -version: string
+        -releaseNotes: string
+        -fileHash: string
+        -size: number
+        -releaseDate: datetime
+        -critical: boolean
+    }
+
+    %% Dashboard & Reporting
+    class DashboardService {
+        +getWidgetData(widgetType: string) WidgetData
+        +getAlertSummary() AlertSummary
+        +getVulnerabilitySummary() VulnerabilitySummary
+        +getSystemStatus() SystemStatus
+    }
+
+    class ReportingService {
+        +generateReport(reportType: string, filters: ReportFilter) Report
+        +scheduleReport(reportType: string, schedule: ReportSchedule) bool
+        +getReportTemplates() ReportTemplate[]
+        +getReportHistory() Report[]
+    }
+
+    %% API Gateway
+    class APIGateway {
+        +routeRequest(endpoint: string, method: string, payload: any) APIResponse
+        +validateRequest(request: APIRequest) bool
+        +rateLimit(clientId: string) bool
+        +logRequest(request: APIRequest) bool
+    }
+
+    %% Database Managers
+    class DatabaseManager {
+        <<interface>>
+        +connect() bool
+        +disconnect() bool
+        +query(sql: string, params: any[]) QueryResult
+        +execute(sql: string, params: any[]) ExecutionResult
+        +transaction(operations: DatabaseOperation[]) TransactionResult
+    }
+
+    class SQLiteManager {
+        -dbPath: string
+        -connection: SQLiteConnection
+        +connect() bool
+        +disconnect() bool
+        +query(sql: string, params: any[]) QueryResult
+        +execute(sql: string, params: any[]) ExecutionResult
+        +transaction(operations: DatabaseOperation[]) TransactionResult
+    }
+
+    class PostgreSQLManager {
+        -connectionString: string
+        -pool: ConnectionPool
+        +connect() bool
+        +disconnect() bool
+        +query(sql: string, params: any[]) QueryResult
+        +execute(sql: string, params: any[]) ExecutionResult
+        +transaction(operations: DatabaseOperation[]) TransactionResult
+    }
+
+    %% Relationships
+    SentinelCore -- ScannerService : manages
+    SentinelCore -- FirewallService : manages
+    SentinelCore -- ThreatDetectionService : manages
+    SentinelCore -- UpdateService : manages
+    SentinelCore -- AuthService : uses
+    SentinelCore -- APIGateway : exposes
+    SentinelCore -- DashboardService : provides
+    SentinelCore -- ReportingService : provides
+    
+    User "*" -- "1" Role : has
+    Role "*" -- "*" Permission : contains
+    AuthService -- User : manages
+    AuthService -- Role : manages
+    
+    ScannerService -- ScanJob : creates
+    ScanJob "1" -- "1" ScanResult : produces
+    ScanResult "1" -- "*" Finding : contains
+    
+    FirewallService -- FirewallRule : manages
+    
+    ThreatDetectionService -- DetectionRule : manages
+    ThreatDetectionService -- Alert : generates
+    
+    SentinelCore "1" -- "*" Agent : monitors
+    
+    UpdateService -- Update : manages
+    
+    DatabaseManager <|-- SQLiteManager : implements
+    DatabaseManager <|-- PostgreSQLManager : implements
+    
+    SentinelCore -- DatabaseManager : uses

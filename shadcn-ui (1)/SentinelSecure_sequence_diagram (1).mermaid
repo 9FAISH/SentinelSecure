@@ -1,0 +1,139 @@
+sequenceDiagram
+    %% Define participants
+    participant Client as Client (Browser/API Consumer)
+    participant API as API Gateway
+    participant Auth as Auth Service
+    participant Core as SentinelCore
+    participant Scanner as Scanner Service
+    participant Firewall as Firewall Service
+    participant Threat as Threat Detection Service
+    participant Agent as Security Agent
+    participant DB as Database Manager
+    participant Update as Update Service
+
+    %% System Initialization Flow
+    Note over Core: System Initialization
+    Core->>DB: connect()
+    DB-->>Core: connection established
+    Core->>Update: checkForUpdates()
+    Update-->>Core: updateInfo
+    Core->>API: initialize()
+    API-->>Core: API Gateway active
+
+    %% Authentication Flow
+    Note over Client, Auth: User Authentication Flow
+    Client->>API: POST /auth/login {username, password}
+    API->>Auth: login(username, password)
+    Auth->>DB: query("SELECT * FROM users WHERE username = ?", [username])
+    DB-->>Auth: userRecord
+    Auth->>Auth: validatePassword(password, userRecord.passwordHash)
+    alt 2FA Enabled
+        Auth->>Auth: generateTwoFactorCode(userId)
+        Auth-->>Client: 2FA Required
+        Client->>API: POST /auth/verify-2fa {code}
+        API->>Auth: verifyTwoFactorCode(userId, code)
+        Auth-->>API: verification result
+    end
+    Auth->>Auth: generateJWT(userRecord)
+    Auth-->>API: authToken
+    API-->>Client: authToken + user details
+
+    %% Agent Registration Flow
+    Note over Agent, Core: Agent Registration Flow
+    Agent->>API: POST /agents/register {hostname, ipAddress, osInfo}
+    API->>Auth: validateToken(token)
+    Auth-->>API: token valid
+    API->>Core: registerAgent(agentDetails)
+    Core->>DB: execute("INSERT INTO agents", [agentDetails])
+    DB-->>Core: agentId
+    Core->>Core: generateAgentConfig(agentId)
+    Core-->>Agent: agentConfig
+    Agent->>Agent: applyConfiguration(agentConfig)
+
+    %% Vulnerability Scanning Flow
+    Note over Client, Scanner: Vulnerability Scanning Flow
+    Client->>API: POST /scans {target, scanType}
+    API->>Auth: validateToken(token)
+    Auth-->>API: token valid
+    API->>Scanner: scheduleScan(target, scanType)
+    Scanner->>DB: execute("INSERT INTO scan_jobs", [scanJobDetails])
+    DB-->>Scanner: scanJobId
+    Scanner-->>API: scanJob
+    API-->>Client: scanJob
+    Scanner->>Agent: runScan(scanType)
+    Agent->>Agent: performScan()
+    Agent-->>Scanner: scanResults
+    Scanner->>DB: execute("INSERT INTO scan_results", [results])
+    DB-->>Scanner: success
+    Scanner->>Scanner: analyzeScanResults(results)
+    Scanner->>Scanner: generateFindings(results)
+    Scanner->>DB: execute("INSERT INTO findings", [findings])
+    DB-->>Scanner: success
+    Scanner->>Client: notifyScanComplete(scanJobId)
+
+    %% Firewall Rule Management Flow
+    Note over Client, Firewall: Firewall Rule Management Flow
+    Client->>API: POST /firewall/rules {ruleDetails}
+    API->>Auth: validateToken(token)
+    Auth-->>API: token valid
+    API->>Firewall: addRule(ruleDetails)
+    Firewall->>DB: execute("INSERT INTO firewall_rules", [ruleDetails])
+    DB-->>Firewall: ruleId
+    Firewall->>Agent: updateFirewallRules()
+    Agent->>Agent: applyFirewallRules()
+    Agent-->>Firewall: ruleApplied
+    Firewall-->>API: success
+    API-->>Client: success
+
+    %% Threat Detection Flow
+    Note over Agent, Threat: Threat Detection Flow
+    Agent->>Agent: monitorTraffic()
+    Agent->>Agent: collectBehaviorData()
+    Agent->>API: POST /threats/analyze {trafficData}
+    API->>Threat: analyzeTraffic(trafficData)
+    Threat->>Threat: applyDetectionRules(trafficData)
+    alt Threat Detected
+        Threat->>Threat: createAlert(threatDetails)
+        Threat->>DB: execute("INSERT INTO alerts", [alertDetails])
+        DB-->>Threat: alertId
+        Threat->>Client: notifyAlert(alertDetails)
+    end
+    Threat-->>Agent: analysisResults
+
+    %% Update Flow
+    Note over Client, Update: System Update Flow
+    Update->>Update: checkForUpdates()
+    alt Updates Available
+        Update->>Client: notifyUpdatesAvailable(updateInfo)
+        Client->>API: POST /updates/install {updateId}
+        API->>Auth: validateToken(token)
+        Auth-->>API: token valid
+        API->>Update: installUpdate(updateId)
+        Update->>Update: downloadUpdate(updateId)
+        Update->>Update: verifyUpdateHash()
+        Update->>Core: prepareForUpdate()
+        Core->>Core: backupConfiguration()
+        Update->>Core: applyUpdate()
+        Core->>Core: restartServices()
+        Core-->>Update: updateApplied
+        Update-->>API: success
+        API-->>Client: success
+    end
+
+    %% Dashboard Data Flow
+    Note over Client, Core: Dashboard Data Flow
+    Client->>API: GET /dashboard
+    API->>Auth: validateToken(token)
+    Auth-->>API: token valid
+    API->>Core: getDashboardData()
+    Core->>Scanner: getVulnerabilitySummary()
+    Scanner-->>Core: vulnerabilitySummary
+    Core->>Firewall: getFirewallStatus()
+    Firewall-->>Core: firewallStatus
+    Core->>Threat: getAlertSummary()
+    Threat-->>Core: alertSummary
+    Core->>Agent: getAgentsStatus()
+    Agent-->>Core: agentsStatus
+    Core->>Core: compileDashboardData()
+    Core-->>API: dashboardData
+    API-->>Client: dashboardData
